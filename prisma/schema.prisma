@@ -6,9 +6,23 @@ model User {
   email     String  @unique
   name   String
   password    String
+  accountNumber Int @unique
   walletBalance  Decimal
   dateCreated    DateTime @default(now())
+  sentTransactions     Transaction   [] @relation("sentTransactions")
+  receivedTransactions Transaction[]  @relation("receivedTransactions")
 }
+
+model Transaction {
+transactionID  Int @id @default(autoincrement())
+amount          Decimal
+sender          User   @relation("sentTransactions", fields: [senderId], references: [walletId]) 
+receiver        User   @relation("receivedTransactions", fields: [receiverId], references :[walletId])
+senderId       Int
+receiverId     Int 
+
+} 
+
 generator client {
   provider = "prisma-client-js"
 }
