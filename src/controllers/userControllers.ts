@@ -3,12 +3,13 @@ import { prisma } from "../../prisma";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { MY_SECRET_KEY } from "../../key";
+import { generateAcccountNumber } from "../../accountNumber";
 
 export const createUser = async (req: Request, res: Response) => {
   const data = req.body;
-  const { name, email, password,} = data;
-  
+  const { name, email, password } = data;
 
+  const accountNumber = await generateAcccountNumber();
   const saltRounds = 10;
   const hashedPassword = await bcrypt.hash(password, saltRounds);
   const newUser = await prisma.user.create({
@@ -16,8 +17,8 @@ export const createUser = async (req: Request, res: Response) => {
       name,
       email,
       password: hashedPassword,
-      walletBalance: 10000.50,
-      accountNumber : 
+      walletBalance: 10000.00,
+      accountNumber: String(accountNumber)
     },
   });
   return res.status(201).json({

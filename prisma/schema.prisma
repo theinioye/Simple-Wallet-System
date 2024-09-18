@@ -6,7 +6,7 @@ model User {
   email     String  @unique
   name   String
   password    String
-  accountNumber Int @unique
+  accountNumber String @unique
   walletBalance  Decimal
   dateCreated    DateTime @default(now())
   sentTransactions     Transaction   [] @relation("sentTransactions")
