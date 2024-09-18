@@ -17,8 +17,8 @@ export const createUser = async (req: Request, res: Response) => {
       name,
       email,
       password: hashedPassword,
-      walletBalance: 10000.00,
-      accountNumber: String(accountNumber)
+      walletBalance: 10000.0,
+      accountNumber: String(accountNumber),
     },
   });
   return res.status(201).json({
@@ -75,5 +75,61 @@ export const userDashbord = (req: Request, res: Response) => {
   const user = (req as any).user;
   return res.status(200).json({
     message: `Welcome to your dashboard, ${user.name}, your wallet balance is ${user.walletBalance}`,
+  });
+};
+
+export const sendMoney = async (req: Request, res: Response) => {
+  const user = req as any;
+  const data = req.body;
+  const { receiverAccountNumber, amount } = data;
+
+  const senderAccountNumber = user.accountNumber;
+  const receiver = await prisma.user.findUnique({
+    where: {
+      accountNumber: receiverAccountNumber,
+    },
+  });
+  if (!receiver) {
+    return res.status(400).json({
+      message:
+        " The destination acount does not exist. Kindly input a validf destination account number",
+    });
+  }
+  if (amount >= user.walletBalance) {
+    const newSenderWalletBalance = user.walletBalance - amount;
+
+    const newReceiverWalletBalance = receiver.walletBalance + amount;
+
+    await prisma.user.update({
+      where: {
+        accountNumber: senderAccountNumber,
+      },
+      data: {
+        walletBalance: newSenderWalletBalance,
+      },
+    });
+
+    await prisma.user.update({
+      where: {
+        accountNumber: receiverAccountNumber,
+      },
+      data: {
+        walletBalance: newReceiverWalletBalance,
+      },
+    });
+    const transaction = await prisma.transaction.create({
+      data: {
+        amount,
+        receiverAccountNumber,
+        senderAccountNumber: user.accountNumber,
+      },
+    });
+
+    return transaction;
+  }
+
+  return res.status(403).json({
+    message:
+      "You do not have enough balance to complete this transaction, please, fund your wallet to complete this transaction",
   });
 };

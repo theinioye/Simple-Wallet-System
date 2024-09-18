@@ -16,10 +16,11 @@ model User {
 model Transaction {
 transactionID  Int @id @default(autoincrement())
 amount          Decimal
-sender          User   @relation("sentTransactions", fields: [senderId], references: [walletId]) 
-receiver        User   @relation("receivedTransactions", fields: [receiverId], references :[walletId])
-senderId       Int
-receiverId     Int 
+sender          User   @relation("sentTransactions", fields: [senderAccountNumber], references: [accountNumber]) 
+receiver        User   @relation("receivedTransactions", fields: [receiverAccountNumber], references :[accountNumber])
+senderAccountNumber      String
+receiverAccountNumber     String
+dateCreated           DateTime @default(now())
 
 } 
 

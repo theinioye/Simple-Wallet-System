@@ -13,5 +13,5 @@ export const userLogInSchema = z.object({
 });
 export const transactionSchema = z.object({
   amount : z.number(),
-  senderId : z.string()
+  receiverAccountNumber : z.string()
 })
