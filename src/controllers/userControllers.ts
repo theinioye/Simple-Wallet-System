@@ -92,7 +92,7 @@ export const sendMoney = async (req: Request, res: Response) => {
   if (!receiver) {
     return res.status(400).json({
       message:
-        " The destination acount does not exist. Kindly input a validf destination account number",
+        " The destination acount does not exist. Kindly input a valid destination account number",
     });
   }
   if (amount >= user.walletBalance) {
