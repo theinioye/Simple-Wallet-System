@@ -73,13 +73,22 @@ export const userLogIn = async (req: Request, res: Response) => {
 };
 export const userDashbord = (req: Request, res: Response) => {
   const user = (req as any).user;
+
+  const walletBalance = (req as any).walletBalance
   return res.status(200).json({
-    message: `Welcome to your dashboard, ${user.name}, your wallet balance is ${user.walletBalance}`,
+    message: `Welcome to your dashboard, ${user.name}, your wallet balance is ${walletBalance}`,
   });
 };
 
 export const sendMoney = async (req: Request, res: Response) => {
-  const user = req as any;
+  const user = (req as any).user
+  const userId = user.walletId
+
+  const sender = await prisma.user.findUnique({
+    where : {
+      walletId : userId
+    }
+  })
   const data = req.body;
   const { receiverAccountNumber, amount } = data;
 
@@ -89,47 +98,54 @@ export const sendMoney = async (req: Request, res: Response) => {
       accountNumber: receiverAccountNumber,
     },
   });
+  
   if (!receiver) {
     return res.status(400).json({
       message:
         " The destination acount does not exist. Kindly input a valid destination account number",
     });
   }
-  if (amount >= user.walletBalance) {
-    const newSenderWalletBalance = user.walletBalance - amount;
 
-    const newReceiverWalletBalance = receiver.walletBalance + amount;
 
-    await prisma.user.update({
-      where: {
-        accountNumber: senderAccountNumber,
-      },
-      data: {
-        walletBalance: newSenderWalletBalance,
-      },
+  const senderWalletBalance = user.walletBalance 
+
+
+  if (amount > senderWalletBalance) {
+    return res.status(403).json({
+      message:
+        "You do not have enough balance to complete this transaction, please, fund your wallet to complete this transaction",
     });
-
-    await prisma.user.update({
-      where: {
-        accountNumber: receiverAccountNumber,
-      },
-      data: {
-        walletBalance: newReceiverWalletBalance,
-      },
-    });
-    const transaction = await prisma.transaction.create({
-      data: {
-        amount,
-        receiverAccountNumber,
-        senderAccountNumber: user.accountNumber,
-      },
-    });
-
-    return transaction;
   }
+return res.json(`${sender}`)
+}
+//   const newSenderWalletBalance = senderWalletBalance - amount;
 
-  return res.status(403).json({
-    message:
-      "You do not have enough balance to complete this transaction, please, fund your wallet to complete this transaction",
-  });
-};
+//   const newReceiverWalletBalance = receiver.walletBalance + amount;
+
+//   await prisma.user.update({
+//     where: {
+//       accountNumber: senderAccountNumber,
+//     },
+//     data: {
+//       walletBalance: newSenderWalletBalance,
+//     },
+//   });
+
+//   await prisma.user.update({
+//     where: {
+//       accountNumber: receiverAccountNumber,
+//     },
+//     data: {
+//       walletBalance: newReceiverWalletBalance,
+//     },
+//   });
+//   const transaction = await prisma.transaction.create({
+//     data: {
+//       amount,
+//       receiverAccountNumber,
+//       senderAccountNumber: user.accountNumber,
+//     },
+//   });
+
+//   return transaction;
+// };
