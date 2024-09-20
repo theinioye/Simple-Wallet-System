@@ -59,7 +59,7 @@ export const userLogIn = async (req: Request, res: Response) => {
     });
   } else {
     const token = jwt.sign(
-      { id: user.walletId, name: user.name },
+      { walletId: user.walletId, name: user.name },
       MY_SECRET_KEY,
       {
         expiresIn: "5m",
@@ -71,34 +71,52 @@ export const userLogIn = async (req: Request, res: Response) => {
     });
   }
 };
-export const userDashbord = (req: Request, res: Response) => {
+export const userDashbord = async (req: Request, res: Response) => {
   const user = (req as any).user;
-
-  const walletBalance = (req as any).walletBalance
+  const userId = user.walletId;
+  const userWallet = await prisma.user.findUnique({
+    where: {
+      walletId: userId,
+    },
+  });
+  if (!userWallet) {
+    return res.status(200).json({
+      message: `Welcome to your dashboard, ${user.name}.`,
+    });
+  }
+  const walletBalance = userWallet.walletBalance;
   return res.status(200).json({
     message: `Welcome to your dashboard, ${user.name}, your wallet balance is ${walletBalance}`,
   });
 };
 
 export const sendMoney = async (req: Request, res: Response) => {
-  const user = (req as any).user
-  const userId = user.walletId
-
-  const sender = await prisma.user.findUnique({
-    where : {
-      walletId : userId
-    }
-  })
   const data = req.body;
   const { receiverAccountNumber, amount } = data;
 
-  const senderAccountNumber = user.accountNumber;
+  const user = (req as any).user;
+  const userId = user.walletId;
+
+  const sender = await prisma.user.findUnique({
+    where: {
+      walletId: userId,
+    },
+  });
+
+  if (!sender) {
+    return res.status(403).json({
+      message: `This action is forbidden, reattempt sign in to reinitiate transaction`,
+    });
+  }
+
+  const senderAccountNumber = sender.accountNumber;
+
   const receiver = await prisma.user.findUnique({
     where: {
       accountNumber: receiverAccountNumber,
     },
   });
-  
+
   if (!receiver) {
     return res.status(400).json({
       message:
@@ -106,9 +124,7 @@ export const sendMoney = async (req: Request, res: Response) => {
     });
   }
 
-
-  const senderWalletBalance = user.walletBalance 
-
+  const senderWalletBalance = sender.walletBalance;
 
   if (amount > senderWalletBalance) {
     return res.status(403).json({
@@ -116,36 +132,70 @@ export const sendMoney = async (req: Request, res: Response) => {
         "You do not have enough balance to complete this transaction, please, fund your wallet to complete this transaction",
     });
   }
-return res.json(`${sender}`)
+
+  const newSenderWalletBalance = Number(senderWalletBalance) - amount;
+
+  const newReceiverWalletBalance = receiver.walletBalance + amount;
+
+  await prisma.user.update({
+    where: {
+      accountNumber: senderAccountNumber,
+    },
+    data: {
+      walletBalance: newSenderWalletBalance,
+    },
+  });
+
+  await prisma.user.update({
+    where: {
+      accountNumber: receiverAccountNumber,
+    },
+    data: {
+      walletBalance: newReceiverWalletBalance,
+    },
+  });
+
+  const transaction = await prisma.transaction.create({
+    data: {
+      amount,
+      receiverAccountNumber,
+      senderAccountNumber,
+    },
+  });
+
+  return res.status(200).json({
+    message : `#${transaction.amount} sent sucessfully to ${receiver.name}`
+  })
 }
-//   const newSenderWalletBalance = senderWalletBalance - amount;
 
-//   const newReceiverWalletBalance = receiver.walletBalance + amount;
+ export const viewTransactions = async (req:Request, res: Response) => {
+  const user = (req as any).user
+  const walletId = user.walletId
+  const userWallet = await prisma.user.findUnique({
+    where : {
+      walletId,
+    }
+  })
+  if (!userWallet){
+    return res.status(400).json({
+      message: `User not recognized,reinitiate log In`
+    })
+  }
 
-//   await prisma.user.update({
-//     where: {
-//       accountNumber: senderAccountNumber,
-//     },
-//     data: {
-//       walletBalance: newSenderWalletBalance,
-//     },
-//   });
+ const accountNumber = userWallet.accountNumber
+ 
+ const transactionHistory = await prisma.transaction.findMany({
+  where:{
+    OR :[
+    {senderAccountNumber: accountNumber},
+    {receiverAccountNumber: accountNumber},
 
-//   await prisma.user.update({
-//     where: {
-//       accountNumber: receiverAccountNumber,
-//     },
-//     data: {
-//       walletBalance: newReceiverWalletBalance,
-//     },
-//   });
-//   const transaction = await prisma.transaction.create({
-//     data: {
-//       amount,
-//       receiverAccountNumber,
-//       senderAccountNumber: user.accountNumber,
-//     },
-//   });
+    ],
+  },
+ })
 
-//   return transaction;
-// };
+
+ return res.json({transactionHistory})
+
+ }
+ 
