@@ -4,23 +4,12 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { MY_SECRET_KEY } from "../../key";
 import { generateAcccountNumber } from "../../accountNumber";
+import { encodeString, makeUser } from "./utils";
 
 export const createUser = async (req: Request, res: Response) => {
-  const data = req.body;
-  const { name, email, password } = data;
-
-  const accountNumber = await generateAcccountNumber();
-  const saltRounds = 10;
-  const hashedPassword = await bcrypt.hash(password, saltRounds);
-  const newUser = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-      walletBalance: 10000.0,
-      accountNumber: String(accountNumber),
-    },
-  });
+  const { name, email, password } = req.body
+  
+  const newUser = await makeUser({name,email,password})
   return res.status(201).json({
     message:
       "You have successfullly opened a new wallet with the following details",
@@ -71,6 +60,7 @@ export const userLogIn = async (req: Request, res: Response) => {
     });
   }
 };
+
 export const userDashbord = async (req: Request, res: Response) => {
   const user = (req as any).user;
   const userId = user.walletId;
