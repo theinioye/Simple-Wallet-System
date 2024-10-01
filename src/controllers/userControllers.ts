@@ -4,12 +4,12 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { MY_SECRET_KEY } from "../../key";
 import { generateAcccountNumber } from "../../accountNumber";
-import { compareHash, encodeString, makeUser } from "./utils";
+import { compareHash, createToken, encodeString, errorMessage, makeUser } from "./utils";
 import { findUser } from "./utils";
 export const createUser = async (req: Request, res: Response) => {
-  const { name, email, password } = req.body
-  
-  const newUser = await makeUser({name,email,password})
+  const { name, email, password } = req.body;
+
+  const newUser = await makeUser({ name, email, password });
   return res.status(201).json({
     message:
       "You have successfullly opened a new wallet with the following details",
@@ -18,13 +18,11 @@ export const createUser = async (req: Request, res: Response) => {
 };
 
 export const userLogIn = async (req: Request, res: Response) => {
-  const { email, name, password } = req.body
+  const { email, name, password } = req.body;
   if (!email && !name) {
-    return res.json({
-      message: "Please include a name or username to sign in ",
-    });
+    return res.json(errorMessage);
   }
-   const user = await findUser({name,email})
+  const user = await findUser({ name, email });
 
   if (!user) {
     return res.json({
@@ -33,18 +31,16 @@ export const userLogIn = async (req: Request, res: Response) => {
     });
   }
 
-  const passwordCheck = await compareHash(password, user.password);
-
-  if (!passwordCheck) {
+  if (!(await compareHash(password, user.password))) {
     return res.json({
       message:
         "Email,name or password incorrect. Please check log in details and try again",
     });
   } else {
-    const token = 
+    const token = await createToken(user)
     res.status(200).json({
       message: "Welcome.Log in Successful",
-      token,
+      token
     });
   }
 };
@@ -142,38 +138,34 @@ export const sendMoney = async (req: Request, res: Response) => {
   });
 
   return res.status(200).json({
-    message : `#${transaction.amount} sent sucessfully to ${receiver.name}`
-  })
-}
+    message: `#${transaction.amount} sent sucessfully to ${receiver.name}`,
+  });
+};
 
- export const viewTransactions = async (req:Request, res: Response) => {
-  const user = (req as any).user
-  const walletId = user.walletId
+export const viewTransactions = async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  const walletId = user.walletId;
   const userWallet = await prisma.user.findUnique({
-    where : {
+    where: {
       walletId,
-    }
-  })
-  if (!userWallet){
+    },
+  });
+  if (!userWallet) {
     return res.status(400).json({
-      message: `User not recognized,reinitiate log In`
-    })
+      message: `User not recognized,reinitiate log In`,
+    });
   }
 
- const accountNumber = userWallet.accountNumber
- 
- const transactionHistory = await prisma.transaction.findMany({
-  where:{
-    OR :[
-    {senderAccountNumber: accountNumber},
-    {receiverAccountNumber: accountNumber},
+  const accountNumber = userWallet.accountNumber;
 
-    ],
-  },
- })
+  const transactionHistory = await prisma.transaction.findMany({
+    where: {
+      OR: [
+        { senderAccountNumber: accountNumber },
+        { receiverAccountNumber: accountNumber },
+      ],
+    },
+  });
 
-
- return res.json({transactionHistory})
-
- }
- 
+  return res.json({ transactionHistory });
+};
