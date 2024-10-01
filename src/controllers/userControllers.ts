@@ -4,8 +4,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { MY_SECRET_KEY } from "../../key";
 import { generateAcccountNumber } from "../../accountNumber";
-import { encodeString, makeUser } from "./utils";
-
+import { compareHash, encodeString, makeUser } from "./utils";
+import { findUser } from "./utils";
 export const createUser = async (req: Request, res: Response) => {
   const { name, email, password } = req.body
   
@@ -18,19 +18,13 @@ export const createUser = async (req: Request, res: Response) => {
 };
 
 export const userLogIn = async (req: Request, res: Response) => {
-  const data = req.body;
-  const { email, name, password } = data;
+  const { email, name, password } = req.body
   if (!email && !name) {
     return res.json({
       message: "Please include a name or username to sign in ",
     });
   }
-  const user = await prisma.user.findUnique({
-    where: {
-      name,
-      email,
-    },
-  });
+   const user = await findUser({name,email})
 
   if (!user) {
     return res.json({
@@ -39,7 +33,7 @@ export const userLogIn = async (req: Request, res: Response) => {
     });
   }
 
-  const passwordCheck = bcrypt.compare(password, user.password);
+  const passwordCheck = await compareHash(password, user.password);
 
   if (!passwordCheck) {
     return res.json({
@@ -47,13 +41,7 @@ export const userLogIn = async (req: Request, res: Response) => {
         "Email,name or password incorrect. Please check log in details and try again",
     });
   } else {
-    const token = jwt.sign(
-      { walletId: user.walletId, name: user.name },
-      MY_SECRET_KEY,
-      {
-        expiresIn: "5m",
-      }
-    );
+    const token = 
     res.status(200).json({
       message: "Welcome.Log in Successful",
       token,

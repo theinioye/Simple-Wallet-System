@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import { prisma } from "../../prisma";
 import { generateAcccountNumber } from "../../accountNumber";
-
+import jwt from "jsonwebtoken";
 export async function encodeString(string: string) {
   const saltRounds = 10;
   const encodedString = await bcrypt.hash(string, saltRounds);
@@ -26,4 +26,34 @@ export async function makeUser(data: user) {
   });
 
   return user;
+}
+
+type userdata = {
+  name: string;
+  email: string;
+};
+export async function findUser(data: userdata) {
+  const user = await prisma.user.findUnique({
+    where: {
+      name: data.name,
+      email: data.email,
+    },
+  });
+  return user
+}
+
+
+export async function compareHash (password:string,hash:string) {
+    const compare = bcrypt.compare(password, hash);
+return compare
+
+}
+export async function createToken (user :any) {
+    const token = jwt.sign(
+        { walletId: user.walletId, name: user.name },
+        MY_SECRET_KEY,
+        {
+          expiresIn: "5m",
+        }
+      );
 }
