@@ -4,7 +4,8 @@ import { generateAcccountNumber } from "../../accountNumber";
 import jwt from "jsonwebtoken";
 import { MY_SECRET_KEY } from "../../key";
 import { Request, Response } from "express";
-
+import { Decimal } from "@prisma/client/runtime/library";
+import { optional } from "zod";
 
 export async function encodeString(string: string) {
   const saltRounds = 10;
@@ -59,11 +60,86 @@ export async function createToken(user: any) {
       expiresIn: "5m",
     }
   );
-return token
+  return token;
 }
 
-export function errorMessage (){
-    return{
-        message: "Please include a name or username to sign in ",
-      }
+export function signInError() {
+  return {
+    message: "No name or username included ",
+  };
+}
+
+export async function findUniqueUser(walletId?: any, accountNumber?: any) {
+  const sender = await prisma.user.findUnique({
+    where: {
+      walletId,
+      accountNumber,
+    },
+  });
+  return sender;
+}
+export function logInMessage() {
+  return {
+    message: `Log in successful`,
+  };
+}
+export function LogInBalance(name: any, balance: Decimal) {
+  return {
+    message: `${name}, ${balance}`,
+  };
+}
+
+export function userError() {
+  return {
+    message: "user not found",
+  };
+}
+export function passwordError() {
+  return {
+    message:
+      "Email,name or password incorrect. Please check log in details and try again",
+  };
+}
+export function dashboardMessage(name: any) {
+  return {
+    message: `Welcome to your dashboard, ${name}.`,
+  };
+}
+type transaction = {
+  amount: any;
+  receiverAccountNumber: any;
+  senderAccountNumber: string;
+};
+export async function createTransaction(data: transaction) {
+  const transaction = await prisma.transaction.create({
+    data: {
+      amount: data.amount,
+      receiverAccountNumber: data.receiverAccountNumber,
+      senderAccountNumber: data.senderAccountNumber,
+    },
+  });
+  return transaction;
+}
+
+export async function retrieveTransactionHistory(accountNumber: string) {
+  const transactionHistory = await prisma.transaction.findMany({
+    where: {
+      OR: [
+        { senderAccountNumber: accountNumber },
+        { receiverAccountNumber: accountNumber },
+      ],
+    },
+  });
+  return transactionHistory;
+}
+
+export async function updateBalance(accountNumber: any, walletBalance: any) {
+  await prisma.user.update({
+    where: {
+      accountNumber,
+    },
+    data: {
+      walletBalance,
+    },
+  });
 }

@@ -1,11 +1,21 @@
 import { Request, Response } from "express";
-import { prisma } from "../../prisma";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { MY_SECRET_KEY } from "../../key";
-import { generateAcccountNumber } from "../../accountNumber";
-import { compareHash, createToken, encodeString, errorMessage, makeUser } from "./utils";
-import { findUser } from "./utils";
+import {
+  compareHash,
+  createToken,
+  passwordError,
+  dashboardMessage,
+  signInError,
+  findUniqueUser,
+  LogInBalance,
+  makeUser,
+  userError,
+  createTransaction,
+  retrieveTransactionHistory,
+  updateBalance,
+  findUser
+} from "./utils";
+
+
 export const createUser = async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
 
@@ -20,82 +30,54 @@ export const createUser = async (req: Request, res: Response) => {
 export const userLogIn = async (req: Request, res: Response) => {
   const { email, name, password } = req.body;
   if (!email && !name) {
-    return res.json(errorMessage);
+    return res.json(signInError);
   }
   const user = await findUser({ name, email });
 
   if (!user) {
-    return res.json({
-      message:
-        "This wallet does not exist.Kindly check log in details and trye again",
-    });
+    return res.json(userError);
   }
 
   if (!(await compareHash(password, user.password))) {
-    return res.json({
-      message:
-        "Email,name or password incorrect. Please check log in details and try again",
-    });
+    return res.json(passwordError());
   } else {
-    const token = await createToken(user)
+    const token = await createToken(user);
     res.status(200).json({
-      message: "Welcome.Log in Successful",
-      token
+      message: "Log in Successful",
+      token,
     });
   }
 };
 
 export const userDashbord = async (req: Request, res: Response) => {
   const user = (req as any).user;
-  const userId = user.walletId;
-  const userWallet = await prisma.user.findUnique({
-    where: {
-      walletId: userId,
-    },
-  });
+  const userWallet = await findUniqueUser(user.walletId);
+
   if (!userWallet) {
-    return res.status(200).json({
-      message: `Welcome to your dashboard, ${user.name}.`,
-    });
+    return res.status(200).json(dashboardMessage(user.name));
   }
-  const walletBalance = userWallet.walletBalance;
-  return res.status(200).json({
-    message: `Welcome to your dashboard, ${user.name}, your wallet balance is ${walletBalance}`,
-  });
+  return res
+    .status(200)
+    .json(LogInBalance(user.name, userWallet.walletBalance));
 };
 
 export const sendMoney = async (req: Request, res: Response) => {
-  const data = req.body;
-  const { receiverAccountNumber, amount } = data;
+  const { receiverAccountNumber, amount } = req.body;
 
   const user = (req as any).user;
-  const userId = user.walletId;
 
-  const sender = await prisma.user.findUnique({
-    where: {
-      walletId: userId,
-    },
-  });
+  const sender = await findUniqueUser(user.walletId);
 
   if (!sender) {
-    return res.status(403).json({
-      message: `This action is forbidden, reattempt sign in to reinitiate transaction`,
-    });
+    return res.status(403).json(userError());
   }
 
   const senderAccountNumber = sender.accountNumber;
 
-  const receiver = await prisma.user.findUnique({
-    where: {
-      accountNumber: receiverAccountNumber,
-    },
-  });
+  const receiver = await findUniqueUser(receiverAccountNumber);
 
   if (!receiver) {
-    return res.status(400).json({
-      message:
-        " The destination acount does not exist. Kindly input a valid destination account number",
-    });
+    return res.status(400).json(userError);
   }
 
   const senderWalletBalance = sender.walletBalance;
@@ -111,30 +93,14 @@ export const sendMoney = async (req: Request, res: Response) => {
 
   const newReceiverWalletBalance = receiver.walletBalance + amount;
 
-  await prisma.user.update({
-    where: {
-      accountNumber: senderAccountNumber,
-    },
-    data: {
-      walletBalance: newSenderWalletBalance,
-    },
-  });
+  await updateBalance(senderAccountNumber, newSenderWalletBalance);
 
-  await prisma.user.update({
-    where: {
-      accountNumber: receiverAccountNumber,
-    },
-    data: {
-      walletBalance: newReceiverWalletBalance,
-    },
-  });
+  await updateBalance(receiverAccountNumber, newReceiverWalletBalance);
 
-  const transaction = await prisma.transaction.create({
-    data: {
-      amount,
-      receiverAccountNumber,
-      senderAccountNumber,
-    },
+  const transaction = await createTransaction({
+    amount,
+    receiverAccountNumber,
+    senderAccountNumber,
   });
 
   return res.status(200).json({
@@ -144,28 +110,12 @@ export const sendMoney = async (req: Request, res: Response) => {
 
 export const viewTransactions = async (req: Request, res: Response) => {
   const user = (req as any).user;
-  const walletId = user.walletId;
-  const userWallet = await prisma.user.findUnique({
-    where: {
-      walletId,
-    },
-  });
+  const userWallet = await findUniqueUser(user.walletId);
   if (!userWallet) {
-    return res.status(400).json({
-      message: `User not recognized,reinitiate log In`,
-    });
+    return res.status(400).json(userError);
   }
-
-  const accountNumber = userWallet.accountNumber;
-
-  const transactionHistory = await prisma.transaction.findMany({
-    where: {
-      OR: [
-        { senderAccountNumber: accountNumber },
-        { receiverAccountNumber: accountNumber },
-      ],
-    },
-  });
-
+  const transactionHistory = retrieveTransactionHistory(
+    userWallet.accountNumber
+  );
   return res.json({ transactionHistory });
 };
