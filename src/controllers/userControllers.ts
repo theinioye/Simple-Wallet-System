@@ -91,7 +91,7 @@ export const sendMoney = async (req: Request, res: Response) => {
 
   const newSenderWalletBalance = Number(senderWalletBalance) - amount;
 
-  const newReceiverWalletBalance = receiver.walletBalance + amount;
+  const newReceiverWalletBalance = Number(receiver.walletBalance) + amount;
 
   await updateBalance(senderAccountNumber, newSenderWalletBalance);
 
